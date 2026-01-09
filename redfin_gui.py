@@ -59,7 +59,7 @@ import glob
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.8.6"
+        self.version = "1.9.3"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -73,6 +73,10 @@ class RedfinDownloaderGUI:
         
         self.root.title(f"Tonys Real Estate Image Downloader v{self.version}")
         self.root.geometry("1400x900")
+        try:
+            self.root.state('zoomed')  # For Windows
+        except:
+            self.root.attributes('-zoomed', True) # For Linux/Mac
         
         # Color Palette - Refined Dark Theme (matching reference)
         self.colors = {
@@ -92,7 +96,7 @@ class RedfinDownloaderGUI:
         self.current_images = []
         self.gallery_thumbnails = []
         self.photo_references = []
-        self.thumbnail_size = 400
+        self.thumbnail_size = 300
         self.thumbnail_cache = {}
         self.property_details = {}  # Store property details (price, beds, baths, etc.)
         self.download_cancelled = False
@@ -205,11 +209,11 @@ class RedfinDownloaderGUI:
         
         # Left panel - Download & Explorer
         left_frame = ttk.Frame(main_paned, padding=12)
-        main_paned.add(left_frame, weight=1)
+        main_paned.add(left_frame, weight=2)
         
         # Right panel - Gallery Viewer
         right_frame = ttk.Frame(main_paned, padding=12)
-        main_paned.add(right_frame, weight=5)
+        main_paned.add(right_frame, weight=6)
         
         # === LEFT PANEL ===
         
@@ -262,18 +266,26 @@ class RedfinDownloaderGUI:
         explorer_container.pack(fill=tk.BOTH, expand=True)
         
         # Using Treeview for explorer look (Removed visible scrollbars for cleaner look)
-        self.explorer_tree = ttk.Treeview(explorer_container, columns=('price', 'sqft'), show='tree headings', selectmode='browse')
+        self.explorer_tree = ttk.Treeview(explorer_container, columns=('price', 'sqft', 'beds', 'baths'), show='tree headings', selectmode='browse')
         self.explorer_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Configure headings
-        self.explorer_tree.heading('#0', text=' Address')
-        self.explorer_tree.heading('price', text=' Price')
-        self.explorer_tree.heading('sqft', text=' Sq Ft')
+        # Configure headings with sorting capability
+        self.explorer_tree.heading('#0', text=' Address', command=lambda: self.treeview_sort_column('#0', False))
+        self.explorer_tree.heading('price', text=' Price', command=lambda: self.treeview_sort_column('price', False))
+        self.explorer_tree.heading('sqft', text=' Sq Ft', command=lambda: self.treeview_sort_column('sqft', False))
+        self.explorer_tree.heading('beds', text=' Bed', command=lambda: self.treeview_sort_column('beds', False))
+        self.explorer_tree.heading('baths', text=' Bath', command=lambda: self.treeview_sort_column('baths', False))
         
-        # Configure columns
+        # Add tooltips or indicators to show headers are clickable
+        style = ttk.Style()
+        style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
+        
+        # Configure columns (Balanced for readability)
         self.explorer_tree.column("#0", stretch=True, width=350)
-        self.explorer_tree.column("price", width=120, anchor=tk.W)
-        self.explorer_tree.column("sqft", width=100, anchor=tk.W)
+        self.explorer_tree.column("price", width=80, anchor=tk.W)
+        self.explorer_tree.column("sqft", width=60, anchor=tk.W)
+        self.explorer_tree.column("beds", width=35, anchor=tk.W)
+        self.explorer_tree.column("baths", width=35, anchor=tk.W)
         
         self.explorer_tree.bind('<<TreeviewSelect>>', self.on_tree_select)
         
@@ -358,12 +370,12 @@ class RedfinDownloaderGUI:
         zoom_frame.pack(side=tk.RIGHT)
         
         ttk.Label(zoom_frame, text="View size:", style="Sub.TLabel").pack(side=tk.LEFT, padx=5)
-        self.zoom_slider = ttk.Scale(zoom_frame, from_=150, to=800, orient=tk.HORIZONTAL, 
+        self.zoom_slider = ttk.Scale(zoom_frame, from_=100, to=800, orient=tk.HORIZONTAL, 
                                       command=self.on_zoom_change, length=150)
         self.zoom_slider.pack(side=tk.LEFT, padx=5)
-        self.zoom_label = ttk.Label(zoom_frame, text="400px", style="Sub.TLabel")
+        self.zoom_label = ttk.Label(zoom_frame, text="300px", style="Sub.TLabel")
         self.zoom_label.pack(side=tk.LEFT, padx=(5, 0))
-        self.zoom_slider.set(400)
+        self.zoom_slider.set(300)
         
         # Gallery Area
         gallery_outer = ttk.Frame(right_frame)
@@ -406,12 +418,15 @@ class RedfinDownloaderGUI:
         if not hasattr(self, 'zoom_label'):
             return
             
-        new_size = int(float(value))
+        # Round to nearest 50
+        raw_val = float(value)
+        new_size = int(round(raw_val / 50) * 50)
+        
         self.thumbnail_size = new_size
         self.zoom_label.config(text=f"{self.thumbnail_size}px")
         
-        # Only reload if size changed significantly (every 10px) to reduce re-renders
-        if hasattr(self, '_last_size') and abs(new_size - self._last_size) < 10:
+        # Only reload if size changed significantly (every 50px - handled by rounding)
+        if hasattr(self, '_last_size') and self._last_size == new_size:
             return
         
         self._last_size = new_size
@@ -457,6 +472,37 @@ class RedfinDownloaderGUI:
         widget.bind("<Button-2>", show_menu)
         widget.bind("<Control-Button-1>", show_menu)
 
+    def treeview_sort_column(self, col, reverse):
+        """Sort treeview column."""
+        # Get all top-level items (the property nodes)
+        nodes = self.explorer_tree.get_children('')
+        
+        if col == "#0":
+            # For the main address column (text)
+            items = [(self.explorer_tree.item(k, "text").lower(), k) for k in nodes]
+        else:
+            # For data columns (Price, Sq Ft)
+            items = []
+            for k in nodes:
+                val = str(self.explorer_tree.set(k, col))
+                # Parse numeric values: remove $, commas, sqft etc
+                try:
+                    # Strip everything except digits and decimal point
+                    numeric_val = float(re.sub(r'[^\d.]', '', val))
+                except (ValueError, TypeError):
+                    numeric_val = val.lower()
+                items.append((numeric_val, k))
+        
+        # Sort the items
+        items.sort(reverse=reverse)
+
+        # Rearrange items in tree
+        for index, (_, k) in enumerate(items):
+            self.explorer_tree.move(k, '', index)
+
+        # Toggle sort order for next click
+        self.explorer_tree.heading(col, command=lambda _col=col: self.treeview_sort_column(_col, not reverse))
+
     def refresh_properties(self):
         """Refresh the list of downloaded properties."""
         for item in self.explorer_tree.get_children():
@@ -489,11 +535,13 @@ class RedfinDownloaderGUI:
             
             price = details.get('price', '—')
             sqft = details.get('sqft', '—')
+            beds = details.get('beds', '—')
+            baths = details.get('baths', '—')
             
-            # Insert property node with Price and Sq Ft columns
-            item_id = self.explorer_tree.insert('', tk.END, text=f" 🏠 {prop}", values=(price, sqft))
+            # Insert property node with detailed columns (Order: price, sqft, beds, baths)
+            item_id = self.explorer_tree.insert('', tk.END, text=f" 🏠 {prop}", values=(price, sqft, beds, baths))
             # Insert a "Photos" sub-node
-            self.explorer_tree.insert(item_id, tk.END, text=f"   📸 Photos ({image_count})", values=(price, sqft), tags=('subnode',))
+            self.explorer_tree.insert(item_id, tk.END, text=f"   📸 Photos ({image_count})", values=(price, sqft, beds, baths), tags=('subnode',))
     
     def on_tree_select(self, event):
         """Handle property selection from the tree."""

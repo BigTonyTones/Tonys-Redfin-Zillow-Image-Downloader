@@ -231,6 +231,9 @@ class RedfinDownloaderGUI:
         self.url_entry.bind('<FocusIn>', lambda e: self.url_entry.delete(0, tk.END) if self.url_entry.get() == "Enter Redfin or Zillow URL..." else None)
         self.url_entry.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
+        # Add right-click menu to url_entry
+        self.add_right_click_menu(self.url_entry)
+        
         # Download buttons in 2-column layout
         button_grid = ttk.Frame(download_section)
         button_grid.pack(fill=tk.X, pady=(0, 0))
@@ -427,6 +430,22 @@ class RedfinDownloaderGUI:
             # Don't check uppercase separately - it causes duplicates on case-insensitive filesystems
         return sorted(list(set(images)))  # Remove any duplicates and sort
     
+    def add_right_click_menu(self, widget):
+        """Add right-click context menu to a widget."""
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Cut", command=lambda: widget.event_generate("<<Cut>>"))
+        menu.add_command(label="Copy", command=lambda: widget.event_generate("<<Copy>>"))
+        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
+        menu.add_separator()
+        menu.add_command(label="Select All", command=lambda: widget.select_range(0, tk.END))
+
+        def show_menu(event):
+            widget.focus_set()
+            menu.tk_popup(event.x_root, event.y_root)
+            return "break"
+
+        widget.bind("<Button-3>", show_menu)
+
     def refresh_properties(self):
         """Refresh the list of downloaded properties."""
         for item in self.explorer_tree.get_children():

@@ -58,7 +58,7 @@ import glob
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.4"
+        self.version = "1.5"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -93,6 +93,7 @@ class RedfinDownloaderGUI:
         self.photo_references = []
         self.thumbnail_size = 400
         self.thumbnail_cache = {}
+        self.download_cancelled = False
         
         self.setup_styles()
         self.setup_ui()
@@ -228,8 +229,17 @@ class RedfinDownloaderGUI:
         self.url_entry.bind('<FocusIn>', lambda e: self.url_entry.delete(0, tk.END) if self.url_entry.get() == "Enter Redfin or Zillow URL..." else None)
         self.url_entry.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
-        self.download_btn = ttk.Button(download_section, text=" ↓  START DOWNLOAD", command=self.start_download)
-        self.download_btn.pack(fill=tk.X, ipady=5)
+        # Download buttons in 2-column layout
+        button_grid = ttk.Frame(download_section)
+        button_grid.pack(fill=tk.X, pady=(0, 0))
+        button_grid.columnconfigure(0, weight=1)
+        button_grid.columnconfigure(1, weight=1)
+        
+        self.download_btn = ttk.Button(button_grid, text=" ↓  START", command=self.start_download)
+        self.download_btn.grid(row=0, column=0, sticky='ew', padx=(0, 3), ipady=5)
+        
+        self.stop_btn = ttk.Button(button_grid, text=" ⬛  STOP", command=self.stop_download, state=tk.DISABLED)
+        self.stop_btn.grid(row=0, column=1, sticky='ew', padx=(3, 0), ipady=5)
         
         # Progress section (Subtle)
         self.progress_var = tk.StringVar(value="System Ready")
@@ -292,8 +302,10 @@ class RedfinDownloaderGUI:
         # Exit button
         exit_btn = ttk.Button(controls_frame, text="Exit", style="Exit.TButton", command=self.root.destroy)
         exit_btn.pack(side=tk.LEFT, padx=3)
-            
-        ttk.Button(gallery_header, text=" 📂  OPEN FOLDER", command=self.open_folder).pack(side=tk.RIGHT, padx=10)
+        
+        # Delete and Open Folder buttons
+        ttk.Button(gallery_header, text="Delete Property", command=self.delete_property).pack(side=tk.RIGHT, padx=3)
+        ttk.Button(gallery_header, text="Open Folder", command=self.open_folder).pack(side=tk.RIGHT, padx=3)
         
         # Info bar
         info_frame = ttk.Frame(right_frame)
@@ -586,55 +598,133 @@ class RedfinDownloaderGUI:
         self.gallery_canvas.configure(scrollregion=self.gallery_canvas.bbox("all"))
     
     def show_fullsize(self, image_path):
-        """Show full-size image in a new window."""
+        """Show full-size image in a new window with navigation."""
+        # Find current image index
+        try:
+            current_index = self.current_images.index(image_path)
+        except ValueError:
+            current_index = 0
+        
         fullsize_window = tk.Toplevel(self.root)
         fullsize_window.title(os.path.basename(image_path))
-        fullsize_window.geometry("1200x900")
+        
+        # Set consistent size and center on screen
+        window_width = 1200
+        window_height = 900
+        screen_width = fullsize_window.winfo_screenwidth()
+        screen_height = fullsize_window.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        fullsize_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
         fullsize_window.configure(bg=self.colors['bg'])
         
+        # Container for navigation and image
+        main_container = ttk.Frame(fullsize_window)
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Navigation bar at top
+        nav_bar = ttk.Frame(main_container)
+        nav_bar.pack(fill=tk.X, padx=20, pady=(20, 10))
+        
+        # Image counter
+        counter_label = ttk.Label(nav_bar, text=f"Image {current_index + 1} of {len(self.current_images)}", 
+                                 style="Sub.TLabel")
+        counter_label.pack(side=tk.LEFT)
+        
+        # Keyboard shortcut hint
+        hint_label = ttk.Label(nav_bar, text="Use ← → arrow keys to navigate", 
+                              style="Sub.TLabel", foreground=self.colors['text_dim'])
+        hint_label.pack(side=tk.LEFT, padx=20)
+        
+        # Navigation buttons
+        nav_buttons = ttk.Frame(nav_bar)
+        nav_buttons.pack(side=tk.RIGHT)
+        
+        prev_btn = ttk.Button(nav_buttons, text="◀ Previous", width=12)
+        prev_btn.pack(side=tk.LEFT, padx=3)
+        
+        next_btn = ttk.Button(nav_buttons, text="Next ▶", width=12)
+        next_btn.pack(side=tk.LEFT, padx=3)
+        
         # Create canvas for image
-        canvas_frame = ttk.Frame(fullsize_window)
-        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        canvas_frame = ttk.Frame(main_container)
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
         
         canvas = tk.Canvas(canvas_frame, bg=self.colors['card_bg'], highlightthickness=0, cursor="hand2")
         canvas.pack(fill=tk.BOTH, expand=True)
         
-        try:
-            # Load image
-            img = Image.open(image_path)
-            
-            # Get window size
-            fullsize_window.update()
-            win_width = fullsize_window.winfo_width()
-            win_height = fullsize_window.winfo_height()
-            
-            # Scale to fit window
-            img_ratio = img.width / img.height
-            win_ratio = win_width / win_height
-            
-            if img_ratio > win_ratio:
-                new_width = win_width - 40
-                new_height = int(new_width / img_ratio)
-            else:
-                new_height = win_height - 40
-                new_width = int(new_height * img_ratio)
-            
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            photo = ImageTk.PhotoImage(img)
-            
-            # Display image
-            canvas.create_image(win_width // 2, win_height // 2, image=photo, anchor=tk.CENTER)
-            canvas.image = photo
-            
-            # Click anywhere on canvas to close
-            canvas.bind('<Button-1>', lambda e: fullsize_window.destroy())
-            
-            # ESC key to close
-            fullsize_window.bind('<Escape>', lambda e: fullsize_window.destroy())
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load image: {e}")
-            fullsize_window.destroy()
+        def load_image(index):
+            """Load and display image at given index."""
+            if 0 <= index < len(self.current_images):
+                try:
+                    img_path = self.current_images[index]
+                    img = Image.open(img_path)
+                    
+                    # Get canvas size
+                    canvas.update()
+                    win_width = canvas.winfo_width()
+                    win_height = canvas.winfo_height()
+                    
+                    # Scale to fit
+                    img_ratio = img.width / img.height
+                    win_ratio = win_width / win_height
+                    
+                    if img_ratio > win_ratio:
+                        new_width = win_width - 40
+                        new_height = int(new_width / img_ratio)
+                    else:
+                        new_height = win_height - 40
+                        new_width = int(new_height * img_ratio)
+                    
+                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    
+                    # Clear and display
+                    canvas.delete("all")
+                    canvas.create_image(win_width // 2, win_height // 2, image=photo, anchor=tk.CENTER)
+                    canvas.image = photo
+                    
+                    # Update counter and title
+                    counter_label.config(text=f"Image {index + 1} of {len(self.current_images)}")
+                    fullsize_window.title(os.path.basename(img_path))
+                    
+                    # Update button states
+                    prev_btn.config(state=tk.NORMAL if index > 0 else tk.DISABLED)
+                    next_btn.config(state=tk.NORMAL if index < len(self.current_images) - 1 else tk.DISABLED)
+                    
+                    return index
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load image: {e}")
+            return current_index
+        
+        # Navigation functions
+        current_idx = [current_index]  # Use list to allow modification in nested function
+        
+        def show_previous(event=None):
+            if current_idx[0] > 0:
+                current_idx[0] = load_image(current_idx[0] - 1)
+        
+        def show_next(event=None):
+            if current_idx[0] < len(self.current_images) - 1:
+                current_idx[0] = load_image(current_idx[0] + 1)
+        
+        # Bind navigation
+        prev_btn.config(command=show_previous)
+        next_btn.config(command=show_next)
+        
+        # Keyboard shortcuts
+        fullsize_window.bind('<Left>', show_previous)
+        fullsize_window.bind('<Right>', show_next)
+        fullsize_window.bind('<Escape>', lambda e: fullsize_window.destroy())
+        
+        # Click to close
+        canvas.bind('<Button-1>', lambda e: fullsize_window.destroy())
+        
+        # Load initial image
+        load_image(current_index)
+        
+        # Set focus to window so keyboard shortcuts work immediately
+        fullsize_window.focus_force()
     
     def open_folder(self):
         """Open the current property folder in file explorer."""
@@ -651,6 +741,44 @@ class RedfinDownloaderGUI:
         else:
             subprocess.run(['xdg-open', property_path])
     
+    def delete_property(self):
+        """Delete the currently selected property folder."""
+        if not self.current_property:
+            messagebox.showwarning("No Property", "Please select a property first")
+            return
+        
+        property_path = os.path.join(self.output_folder, self.current_property)
+        
+        # Confirm deletion
+        confirm = messagebox.askyesno(
+            "Delete Property",
+            f"Are you sure you want to delete:\n\n{self.current_property}\n\nThis will permanently delete all images for this property."
+        )
+        
+        if confirm:
+            try:
+                import shutil
+                shutil.rmtree(property_path)
+                messagebox.showinfo("Deleted", f"Property deleted: {self.current_property}")
+                
+                # Clear current selection and refresh
+                self.current_property = None
+                self.current_images = []
+                self.property_label.config(text="Ready to browse")
+                self.image_counter.config(text="0 images loaded")
+                
+                # Clear gallery
+                for widget in self.gallery_container.winfo_children():
+                    widget.destroy()
+                self.gallery_thumbnails = []
+                self.photo_references = []
+                
+                # Refresh property list
+                self.refresh_properties()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete property: {e}")
+    
     def start_download(self):
         """Start downloading images in a background thread."""
         url = self.url_entry.get().strip()
@@ -664,12 +792,22 @@ class RedfinDownloaderGUI:
             return
         
         self.download_btn.config(state=tk.DISABLED)
+        self.stop_btn.config(state=tk.NORMAL)
+        self.download_cancelled = False
         self.progress_bar.start()
         self.progress_var.set("Downloading...")
         
         thread = threading.Thread(target=self.download_images, args=(url,))
         thread.daemon = True
         thread.start()
+    
+    def stop_download(self):
+        """Stop the current download."""
+        self.download_cancelled = True
+        self.progress_bar.stop()
+        self.progress_var.set("Download cancelled")
+        self.download_btn.config(state=tk.NORMAL)
+        self.stop_btn.config(state=tk.DISABLED)
     
     def download_images(self, url):
         """Download images from Redfin or Zillow (runs in background thread)."""
@@ -750,6 +888,11 @@ class RedfinDownloaderGUI:
             total = len(images)
             
             for idx, (cdn_num, photo_id, photo_name) in enumerate(images, 1):
+                # Check if download was cancelled
+                if self.download_cancelled:
+                    self.root.after(0, lambda: self.progress_var.set(f"Cancelled - Downloaded {downloaded}/{total}"))
+                    return
+                    
                 self.root.after(0, lambda i=idx, t=total: self.progress_var.set(f"Downloading {i}/{t}..."))
                 
                 # Try different URL formats using the CDN number from the page
@@ -852,6 +995,11 @@ class RedfinDownloaderGUI:
             total = len(images)
             
             for idx, photo_id in enumerate(images, 1):
+                # Check if download was cancelled
+                if self.download_cancelled:
+                    self.root.after(0, lambda: self.progress_var.set(f"Cancelled - Downloaded {downloaded}/{total}"))
+                    return
+                    
                 self.root.after(0, lambda i=idx, t=total: self.progress_var.set(f"Downloading {i}/{t}..."))
                 
                 size_options = ['cc_ft_1536', 'cc_ft_1344', 'cc_ft_960', 'uncropped_scaled_within_1536_1024']

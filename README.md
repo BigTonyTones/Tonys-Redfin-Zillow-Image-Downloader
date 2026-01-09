@@ -1,4 +1,4 @@
-# Tonys Redfin Zillow Image Downloader v1.4
+# Tonys Redfin Zillow Image Downloader v1.5
 
 I made this tool to quickly grab high-res photos from Redfin and Zillow listings. It has a nice dark theme, it's fast, and it automatically organizes everything into folders by address so you don't have to.
 

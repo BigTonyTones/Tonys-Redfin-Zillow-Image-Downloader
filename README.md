@@ -4,13 +4,6 @@ I made this tool to quickly grab high-res photos from Redfin and Zillow listings
 
 ![App Preview](assets/screenshot.png)
 
-## 📥 Installation
-
-```bash
-git clone https://github.com/BigTonyTones/Tonys-Redfin-Zillow-Image-Downloader.git
-cd Tonys-Redfin-Zillow-Image-Downloader
-```
-
 ### What it does:
 - **Grabs High-Res Photos**: Pulls the best quality images directly from Redfin and Zillow.
 - **Built-in Gallery**: You can browse your downloads right inside the app.
@@ -21,12 +14,21 @@ cd Tonys-Redfin-Zillow-Image-Downloader
 ### How to use it:
 
 **Windows:**
-1.  **Open**: Just run `Start.bat`.
-2.  **Paste**: Put a Redfin or Zillow link in the box and hit Download.
-3.  **Browse**: Click a property in your library on the left to see the photos.
+1.  **Clone the repo**: 
+    ```bash
+    git clone https://github.com/BigTonyTones/Tonys-Redfin-Zillow-Image-Downloader.git
+    cd Tonys-Redfin-Zillow-Image-Downloader
+    ```
+2.  **Run**: Double-click `Start.bat`
+3.  **Paste**: Put a Redfin or Zillow link in the box and hit Download.
+4.  **Browse**: Click a property in your library on the left to see the photos.
 
 **Linux/Mac:**
-1.  **Open Terminal** in the project folder
+1.  **Clone the repo**: 
+    ```bash
+    git clone https://github.com/BigTonyTones/Tonys-Redfin-Zillow-Image-Downloader.git
+    cd Tonys-Redfin-Zillow-Image-Downloader
+    ```
 2.  **Make executable**: `chmod +x startup.sh`
 3.  **Run**: `./startup.sh`
 4.  **Paste**: Put a Redfin or Zillow link in the box and hit Download.

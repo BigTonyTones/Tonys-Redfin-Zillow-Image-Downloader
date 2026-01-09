@@ -59,7 +59,7 @@ import glob
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.8.1"
+        self.version = "1.8.3"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -1419,9 +1419,20 @@ class RedfinDownloaderGUI:
                         else:
                             shutil.copy2(s, d)
                 
+                # Ensure startup.sh is executable on Linux/Mac
+                if sys.platform != 'win32':
+                    try:
+                        startup_script = os.path.abspath("startup.sh")
+                        if os.path.exists(startup_script):
+                            os.chmod(startup_script, 0o755)
+                    except Exception as e:
+                        print(f"Failed to set permissions on startup.sh: {e}")
+
                 # Cleanup
-                os.remove(update_zip)
-                shutil.rmtree(extract_path)
+                if os.path.exists(update_zip):
+                    os.remove(update_zip)
+                if os.path.exists(extract_path):
+                    shutil.rmtree(extract_path)
                 
                 self.root.after(0, lambda: messagebox.showinfo("Update Complete", "Application updated successfully! The app will now restart."))
                 

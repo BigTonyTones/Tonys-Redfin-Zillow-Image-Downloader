@@ -208,7 +208,7 @@ class RedfinDownloaderGUI:
         # === LEFT PANEL ===
         
         # Title/Logo area
-        logo_label = ttk.Label(left_frame, text="TONYS DOWNLOADER", font=("Segoe UI Black", 14), foreground=self.colors['fg'])
+        logo_label = ttk.Label(left_frame, text="TONYS REDFIN DOWNLOADER", font=("Segoe UI Black", 14), foreground=self.colors['fg'])
         logo_label.pack(anchor=tk.W, pady=(0, 20))
         
         # Download section
@@ -589,7 +589,7 @@ class RedfinDownloaderGUI:
         canvas_frame = ttk.Frame(fullsize_window)
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        canvas = tk.Canvas(canvas_frame, bg=self.colors['card_bg'], highlightthickness=0)
+        canvas = tk.Canvas(canvas_frame, bg=self.colors['card_bg'], highlightthickness=0, cursor="hand2")
         canvas.pack(fill=tk.BOTH, expand=True)
         
         try:
@@ -619,9 +619,11 @@ class RedfinDownloaderGUI:
             canvas.create_image(win_width // 2, win_height // 2, image=photo, anchor=tk.CENTER)
             canvas.image = photo
             
-            # Add close button
-            close_btn = ttk.Button(fullsize_window, text="Close", command=fullsize_window.destroy)
-            close_btn.pack(pady=5)
+            # Click anywhere on canvas to close
+            canvas.bind('<Button-1>', lambda e: fullsize_window.destroy())
+            
+            # ESC key to close
+            fullsize_window.bind('<Escape>', lambda e: fullsize_window.destroy())
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load image: {e}")

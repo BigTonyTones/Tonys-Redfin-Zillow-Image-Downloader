@@ -58,7 +58,7 @@ import glob
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.2"
+        self.version = "1.3"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -70,7 +70,7 @@ class RedfinDownloaderGUI:
         # Optimize Tcl performance
         self.root.tk.call('tk', 'scaling', 1.33) # Match standard 96dpi scaling
         
-        self.root.title(f"Tonys Redfin Image Downloader v{self.version}")
+        self.root.title(f"Tonys Real Estate Image Downloader v{self.version}")
         self.root.geometry("1400x900")
         
         # Color Palette - Refined Dark Theme (matching reference)
@@ -86,7 +86,7 @@ class RedfinDownloaderGUI:
             'hover_bg': '#35373c'      # Hover background
         }
         
-        self.output_folder = "redfin_images"
+        self.output_folder = "House_Images"
         self.current_property = None
         self.current_images = []
         self.gallery_thumbnails = []
@@ -97,6 +97,9 @@ class RedfinDownloaderGUI:
         self.setup_styles()
         self.setup_ui()
         self.refresh_properties()
+        
+        # Check for updates on startup
+        self.check_for_updates()
         
     def setup_styles(self):
         """Initialize custom premium styles."""
@@ -208,8 +211,12 @@ class RedfinDownloaderGUI:
         # === LEFT PANEL ===
         
         # Title/Logo area
-        logo_label = ttk.Label(left_frame, text="TONYS REDFIN DOWNLOADER", font=("Segoe UI Black", 14), foreground=self.colors['fg'])
-        logo_label.pack(anchor=tk.W, pady=(0, 20))
+        logo_label = ttk.Label(left_frame, text="TONYS IMAGE DOWNLOADER", font=("Segoe UI Black", 13), foreground=self.colors['fg'])
+        logo_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Subtitle
+        subtitle_label = ttk.Label(left_frame, text="Redfin & Zillow", font=("Segoe UI", 9), foreground=self.colors['text_dim'])
+        subtitle_label.pack(anchor=tk.W, pady=(0, 20))
         
         # Download section
         download_section = ttk.Frame(left_frame)
@@ -217,8 +224,8 @@ class RedfinDownloaderGUI:
         
         self.url_entry = ttk.Entry(download_section)
         # Custom placeholder behavior
-        self.url_entry.insert(0, "Enter Redfin URL...")
-        self.url_entry.bind('<FocusIn>', lambda e: self.url_entry.delete(0, tk.END) if self.url_entry.get() == "Enter Redfin URL..." else None)
+        self.url_entry.insert(0, "Enter Redfin or Zillow URL...")
+        self.url_entry.bind('<FocusIn>', lambda e: self.url_entry.delete(0, tk.END) if self.url_entry.get() == "Enter Redfin or Zillow URL..." else None)
         self.url_entry.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
         self.download_btn = ttk.Button(download_section, text=" ↓  START DOWNLOAD", command=self.start_download)
@@ -258,11 +265,16 @@ class RedfinDownloaderGUI:
         
         self.explorer_tree.bind('<<TreeviewSelect>>', self.on_tree_select)
         
-        # Refresh container
+        # Refresh container - 2 column layout
         button_frame = ttk.Frame(left_frame)
         button_frame.pack(fill=tk.X, pady=(15, 0))
         
-        ttk.Button(button_frame, text=" 🔄  REFRESH LIBRARY", command=self.refresh_properties).pack(fill=tk.X)
+        # Configure grid columns to expand equally
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        
+        ttk.Button(button_frame, text=" 🔄  REFRESH", command=self.refresh_properties).grid(row=0, column=0, sticky='ew', padx=(0, 3))
+        ttk.Button(button_frame, text=" 🔔  UPDATES", command=self.manual_update_check).grid(row=0, column=1, sticky='ew', padx=(3, 0))
         
         # === RIGHT PANEL - GALLERY VIEWER ===
         
@@ -277,16 +289,11 @@ class RedfinDownloaderGUI:
         controls_frame = ttk.Frame(gallery_header)
         controls_frame.pack(side=tk.RIGHT)
         
-        # Mock buttons matching screenshot layout
-        for txt in ["Sort by: Date", "Filter: All", "View: Grid"]:
-            btn = ttk.Button(controls_frame, text=txt, style="TButton")
-            btn.pack(side=tk.LEFT, padx=3)
-            
-        # Exit button placed to the right of View Grid
+        # Exit button
         exit_btn = ttk.Button(controls_frame, text="Exit", style="Exit.TButton", command=self.root.destroy)
         exit_btn.pack(side=tk.LEFT, padx=3)
             
-        ttk.Button(gallery_header, text=" 📂  EXPLORER", command=self.open_folder).pack(side=tk.RIGHT, padx=10)
+        ttk.Button(gallery_header, text=" 📂  OPEN FOLDER", command=self.open_folder).pack(side=tk.RIGHT, padx=10)
         
         # Info bar
         info_frame = ttk.Frame(right_frame)
@@ -649,11 +656,11 @@ class RedfinDownloaderGUI:
         url = self.url_entry.get().strip()
         
         if not url:
-            messagebox.showwarning("No URL", "Please enter a Redfin URL")
+            messagebox.showwarning("No URL", "Please enter a Redfin or Zillow URL")
             return
         
-        if "redfin.com" not in url:
-            messagebox.showerror("Invalid URL", "Please enter a valid Redfin URL")
+        if "redfin.com" not in url and "zillow.com" not in url:
+            messagebox.showerror("Invalid URL", "Please enter a valid Redfin or Zillow URL")
             return
         
         self.download_btn.config(state=tk.DISABLED)
@@ -665,7 +672,18 @@ class RedfinDownloaderGUI:
         thread.start()
     
     def download_images(self, url):
-        """Download images from Redfin (runs in background thread)."""
+        """Download images from Redfin or Zillow (runs in background thread)."""
+        try:
+            # Detect platform
+            if "zillow.com" in url:
+                self.download_zillow_images(url)
+            else:
+                self.download_redfin_images(url)
+        except Exception as e:
+            self.root.after(0, lambda: self.download_error(str(e)))
+    
+    def download_redfin_images(self, url):
+        """Download images from Redfin."""
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -774,6 +792,182 @@ class RedfinDownloaderGUI:
         except Exception as e:
             self.root.after(0, lambda: self.download_error(str(e)))
     
+    def download_zillow_images(self, url):
+        """Download images from Zillow."""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract address from Zillow
+            address = "property"
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text()
+                if '|' in title_text:
+                    address = title_text.split('|')[0].strip()
+            
+            address = re.sub(r'[<>:"/\\|?*]', '', address)
+            address = address.replace(',', '').strip()
+            
+            property_folder = os.path.join(self.output_folder, address)
+            if not os.path.exists(property_folder):
+                os.makedirs(property_folder)
+            
+            # Extract Zillow images
+            images = []
+            zillow_pattern = r'https://photos\.zillowstatic\.com/fp/([a-f0-9]+)-(?:cc_ft_\d+|uncropped_scaled_within_\d+_\d+)'
+            matches = re.findall(zillow_pattern, response.text)
+            
+            if matches:
+                seen = set()
+                for photo_id in matches:
+                    if photo_id not in seen:
+                        seen.add(photo_id)
+                        images.append(photo_id)
+            
+            if not images:
+                json_pattern = r'"hiResImageLink":"(https://photos\.zillowstatic\.com/fp/[^"]+)"'
+                json_matches = re.findall(json_pattern, response.text)
+                if json_matches:
+                    seen = set()
+                    for img_url in json_matches:
+                        photo_id_match = re.search(r'/fp/([a-f0-9]+)-', img_url)
+                        if photo_id_match:
+                            photo_id = photo_id_match.group(1)
+                            if photo_id not in seen:
+                                seen.add(photo_id)
+                                images.append(photo_id)
+            
+            if not images:
+                self.root.after(0, lambda: self.download_error("No images found on this Zillow page"))
+                return
+            
+            downloaded = 0
+            total = len(images)
+            
+            for idx, photo_id in enumerate(images, 1):
+                self.root.after(0, lambda i=idx, t=total: self.progress_var.set(f"Downloading {i}/{t}..."))
+                
+                size_options = ['cc_ft_1536', 'cc_ft_1344', 'cc_ft_960', 'uncropped_scaled_within_1536_1024']
+                success = False
+                
+                for size in size_options:
+                    try:
+                        img_url = f"https://photos.zillowstatic.com/fp/{photo_id}-{size}.webp"
+                        filepath = os.path.join(property_folder, f"{idx:03d}_{photo_id}.webp")
+                        
+                        if os.path.exists(filepath):
+                            downloaded += 1
+                            success = True
+                            break
+                        
+                        img_response = requests.get(img_url, headers=headers, timeout=10)
+                        if img_response.status_code == 200 and len(img_response.content) > 1000:
+                            with open(filepath, 'wb') as f:
+                                f.write(img_response.content)
+                            downloaded += 1
+                            success = True
+                            print(f"Downloaded: {img_url}")
+                            break
+                        else:
+                            img_url_jpg = img_url.replace('.webp', '.jpg')
+                            img_response = requests.get(img_url_jpg, headers=headers, timeout=10)
+                            if img_response.status_code == 200 and len(img_response.content) > 1000:
+                                filepath = filepath.replace('.webp', '.jpg')
+                                with open(filepath, 'wb') as f:
+                                    f.write(img_response.content)
+                                downloaded += 1
+                                success = True
+                                print(f"Downloaded: {img_url_jpg}")
+                                break
+                    except Exception as e:
+                        print(f"Error downloading {img_url}: {e}")
+                        continue
+                
+                if not success:
+                    print(f"Could not download image {idx}: {photo_id}")
+                
+                time.sleep(0.2)
+            
+            self.root.after(0, lambda: self.download_complete(address, downloaded))
+            
+        except Exception as e:
+            self.root.after(0, lambda: self.download_error(str(e)))
+    
+    def check_for_updates(self):
+        """Check for updates from GitHub releases."""
+        def check_update_thread():
+            try:
+                # GitHub API endpoint for latest release
+                api_url = "https://api.github.com/repos/BigTonyTones/Tonys-Redfin-Zillow-Image-Downloader/releases/latest"
+                response = requests.get(api_url, timeout=5)
+                
+                if response.status_code == 200:
+                    release_data = response.json()
+                    latest_version = release_data.get('tag_name', '').replace('v', '')
+                    
+                    if latest_version and latest_version > self.version:
+                        # New version available
+                        self.root.after(0, lambda: self.prompt_update(latest_version, release_data))
+            except Exception as e:
+                # Silently fail - don't bother user with update check errors
+                print(f"Update check failed: {e}")
+        
+        # Run in background thread
+        thread = threading.Thread(target=check_update_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def prompt_update(self, new_version, release_data):
+        """Prompt user to update to new version."""
+        release_notes = release_data.get('body', 'No release notes available.')
+        download_url = release_data.get('html_url', '')
+        
+        message = f"A new version is available!\n\n"
+        message += f"Current version: {self.version}\n"
+        message += f"Latest version: {new_version}\n\n"
+        message += f"Release Notes:\n{release_notes[:200]}...\n\n"
+        message += "Would you like to visit the download page?"
+        
+        if messagebox.askyesno("Update Available", message):
+            import webbrowser
+            webbrowser.open(download_url)
+    
+    def manual_update_check(self):
+        """Manually check for updates (triggered by button)."""
+        def check_update_thread():
+            try:
+                self.root.after(0, lambda: self.progress_var.set("Checking for updates..."))
+                
+                api_url = "https://api.github.com/repos/BigTonyTones/Tonys-Redfin-Zillow-Image-Downloader/releases/latest"
+                response = requests.get(api_url, timeout=10)
+                
+                if response.status_code == 200:
+                    release_data = response.json()
+                    latest_version = release_data.get('tag_name', '').replace('v', '')
+                    
+                    if latest_version and latest_version > self.version:
+                        self.root.after(0, lambda: self.prompt_update(latest_version, release_data))
+                    else:
+                        self.root.after(0, lambda: messagebox.showinfo("No Updates", f"You're running the latest version ({self.version})!"))
+                else:
+                    self.root.after(0, lambda: messagebox.showerror("Update Check Failed", "Could not connect to update server."))
+                
+                self.root.after(0, lambda: self.progress_var.set("System Ready"))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("Update Check Failed", f"Error: {str(e)}"))
+                self.root.after(0, lambda: self.progress_var.set("System Ready"))
+        
+        thread = threading.Thread(target=check_update_thread)
+        thread.daemon = True
+        thread.start()
+    
     def download_complete(self, address, count):
         """Handle successful download completion."""
         self.progress_bar.stop()
@@ -784,7 +978,7 @@ class RedfinDownloaderGUI:
         
         self.refresh_properties()
         self.url_entry.delete(0, tk.END)
-        self.url_entry.insert(0, "Enter Redfin URL...")
+        self.url_entry.insert(0, "Enter Redfin or Zillow URL...")
         
         # Update stats
         if hasattr(self, 'stats_label'):

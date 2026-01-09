@@ -1,5 +1,5 @@
 # Folders to ignore
-redfin_images/
+House_Images/
 
 # Python artifacts
 __pycache__/

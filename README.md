@@ -2,7 +2,7 @@
 
 A high-performance tool designed to capture high-res photos from Redfin and Zillow listings instantly. Featuring a sleek dark theme, multi-threaded downloading, and automatic property metadata extraction.
 
-![App Preview](assets/screenshot.png)
+![App Preview](assets/dashboard_v1_9_3.png)
 
 ### Key Features:
 - **Lightning Fast**: Multi-threaded engine downloads up to 10 images simultaneously.

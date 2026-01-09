@@ -1,0 +1,17 @@
+# Folders to ignore
+redfin_images/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE files
+.vscode/
+.idea/

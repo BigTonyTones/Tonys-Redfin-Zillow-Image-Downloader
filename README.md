@@ -1,15 +1,15 @@
 # Tonys Redfin Zillow Image Downloader v1.8.0
 
-I made this tool to quickly grab high-res photos from Redfin and Zillow listings. It has a nice dark theme, it's fast, and it automatically organizes everything into folders by address so you don't have to.
+A high-performance tool designed to capture high-res photos from Redfin and Zillow listings instantly. Featuring a sleek dark theme, multi-threaded downloading, and automatic property metadata extraction.
 
 ![App Preview](assets/screenshot.png)
 
-### What it does:
-- **Grabs High-Res Photos**: Pulls the best quality images directly from Redfin and Zillow.
-- **Built-in Gallery**: You can browse your downloads right inside the app.
-- **Adjustable View**: Use the slider to make thumbnails bigger or smaller.
-- **Safe Setup**: It'll ask you before installing any missing Python packages.
-- **Folders**: Every property gets its own folder named after the address.
+### Key Features:
+- **Lightning Fast**: Multi-threaded engine downloads up to 10 images simultaneously.
+- **Smart Metadata**: Automatically scrapes Price, Beds, Baths, Sq Ft, and Descriptions.
+- **Auto-Updates**: One-click updates and restarts directly from GitHub releases.
+- **Built-in Gallery**: Browse your downloads and manage property folders within the app.
+- **Dynamic View**: Adjustable thumbnail sizes and high-DPI support for crisp viewing.
 
 ### How to use it:
 

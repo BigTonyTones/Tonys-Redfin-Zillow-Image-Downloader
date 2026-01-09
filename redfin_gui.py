@@ -73,15 +73,17 @@ class RedfinDownloaderGUI:
         self.root.title(f"Tonys Redfin Image Downloader v{self.version}")
         self.root.geometry("1400x900")
         
-        # Color Palette - Premium Dark Mode
+        # Color Palette - Refined Dark Theme (matching reference)
         self.colors = {
-            'bg': '#1e1e1e',
-            'fg': '#e0e0e0',
-            'accent': '#0078d4',
-            'accent_hover': '#2b88d8',
-            'card_bg': '#252526',
-            'border': '#333333',
-            'text_dim': '#a0a0a0'
+            'bg': '#2b2d31',           # Main background - darker
+            'fg': '#dbdee1',           # Primary text - lighter
+            'accent': '#5865f2',       # Accent blue - more vibrant
+            'accent_hover': '#4752c4', # Hover state
+            'card_bg': '#1e1f22',      # Card/panel background - darker
+            'border': '#3f4147',       # Borders - subtle
+            'text_dim': '#949ba4',     # Secondary text
+            'success': '#3ba55d',      # Success/checkmark green
+            'hover_bg': '#35373c'      # Hover background
         }
         
         self.output_folder = "redfin_images"
@@ -120,17 +122,18 @@ class RedfinDownloaderGUI:
         style.configure("Header.TLabel", background=self.colors['bg'], foreground=self.colors['fg'], font=("Segoe UI", 16, "bold"))
         style.configure("Sub.TLabel", background=self.colors['bg'], foreground=self.colors['text_dim'], font=("Segoe UI", 9))
         
-        # Button styling
+        # Button styling - More refined
         style.configure("TButton", 
                         background=self.colors['accent'], 
                         foreground="white", 
                         borderwidth=0, 
                         focuscolor="none",
-                        font=("Segoe UI", 10, "bold"),
-                        padding=(10, 5))
+                        font=("Segoe UI", 9, "bold"),
+                        padding=(12, 6),
+                        relief="flat")
         style.map("TButton", 
-                  background=[('active', self.colors['accent_hover']), ('disabled', '#444444')],
-                  foreground=[('disabled', '#888888')])
+                  background=[('active', self.colors['accent_hover']), ('disabled', '#3f4147')],
+                  foreground=[('disabled', '#6d6f78')])
         
         # Entry styling
         style.configure("TEntry", 
@@ -156,15 +159,16 @@ class RedfinDownloaderGUI:
                         troughcolor=self.colors['card_bg'],
                         borderwidth=0)
         
-        # Exit Button Styling (Red)
+        # Exit Button Styling (Red) - Refined
         style.configure("Exit.TButton", 
-                        background="#d13438", 
+                        background="#da373c", 
                         foreground="white", 
                         borderwidth=0, 
-                        font=("Segoe UI", 10, "bold"),
-                        padding=(10, 5))
+                        font=("Segoe UI", 9, "bold"),
+                        padding=(12, 6),
+                        relief="flat")
         style.map("Exit.TButton", 
-                  background=[('active', '#e81123'), ('disabled', '#444444')])
+                  background=[('active', '#a12d32'), ('disabled', '#3f4147')])
         
         # New Treeview Styling (Explorer style)
         style.configure("Treeview", 
@@ -525,7 +529,7 @@ class RedfinDownloaderGUI:
         for widget in self.gallery_container.winfo_children():
             widget.destroy()
         
-        # Create thumbnail grid
+        # Create thumbnail grid with refined card design
         for idx, thumb, image_path in thumbnails_data:
             row = idx // columns
             col = idx % columns
@@ -533,22 +537,42 @@ class RedfinDownloaderGUI:
             photo = ImageTk.PhotoImage(thumb)
             self.photo_references.append(photo)
             
-            # Create frame for thumbnail
-            thumb_frame = tk.Frame(self.gallery_container, bg=self.colors['card_bg'], highlightbackground=self.colors['border'], highlightthickness=1)
-            thumb_frame.grid(row=row, column=col, padx=padding, pady=padding, sticky='nw')
+            # Create card frame with rounded appearance (simulated with relief)
+            card_frame = tk.Frame(self.gallery_container, bg=self.colors['border'], relief='flat')
+            card_frame.grid(row=row, column=col, padx=padding, pady=padding, sticky='nw')
             
-            # Create label with image
-            label = tk.Label(thumb_frame, image=photo, cursor="hand2", bg=self.colors['card_bg'], borderwidth=0)
-            label.pack(padx=2, pady=2)
+            # Inner frame for content
+            inner_frame = tk.Frame(card_frame, bg=self.colors['card_bg'])
+            inner_frame.pack(padx=1, pady=1)
             
-            # Add image number
-            number_label = tk.Label(thumb_frame, text=f"IMG #{idx + 1}", font=("Segoe UI", 8), bg=self.colors['card_bg'], fg=self.colors['text_dim'])
-            number_label.pack(pady=(0, 5))
+            # Image label
+            label = tk.Label(inner_frame, image=photo, cursor="hand2", bg=self.colors['card_bg'], borderwidth=0)
+            label.pack(padx=4, pady=4)
+            
+            # Caption with property name - Image number
+            caption_text = f"{self.current_property.split(',')[0] if self.current_property else 'Property'} - Image {idx + 1}"
+            caption_label = tk.Label(inner_frame, text=caption_text, 
+                                    font=("Segoe UI", 8), bg=self.colors['card_bg'], 
+                                    fg=self.colors['text_dim'], anchor='w')
+            caption_label.pack(fill=tk.X, padx=8, pady=(0, 8))
             
             # Bind click event
             label.bind('<Button-1>', lambda e, path=image_path: self.show_fullsize(path))
             
-            self.gallery_thumbnails.append((thumb_frame, photo))
+            # Hover effect
+            def on_enter(e, frame=card_frame):
+                frame.config(bg=self.colors['accent'])
+            def on_leave(e, frame=card_frame):
+                frame.config(bg=self.colors['border'])
+            
+            card_frame.bind('<Enter>', on_enter)
+            card_frame.bind('<Leave>', on_leave)
+            inner_frame.bind('<Enter>', on_enter)
+            inner_frame.bind('<Leave>', on_leave)
+            label.bind('<Enter>', on_enter)
+            label.bind('<Leave>', on_leave)
+            
+            self.gallery_thumbnails.append((card_frame, photo))
         
         # Update scroll region
         self.gallery_container.update_idletasks()

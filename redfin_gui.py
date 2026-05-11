@@ -61,7 +61,7 @@ import webbrowser
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.9.4"
+        self.version = "1.9.5"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -102,6 +102,7 @@ class RedfinDownloaderGUI:
         self.thumbnail_cache = {}
         self.property_details = {}  # Store property details (price, beds, baths, etc.)
         self.download_cancelled = False
+        self.all_properties = []  # Cache of all property data for filtering
         
         self.setup_styles()
         self.setup_ui()
@@ -269,45 +270,109 @@ class RedfinDownloaderGUI:
         self.progress_bar = ttk.Progressbar(download_section, mode='indeterminate')
         self.progress_bar.pack(fill=tk.X, pady=(5, 0))
         
-        # Explorer section
+        # Explorer section header
         explorer_label = ttk.Label(left_frame, text="PROPERTY ADDRESSES", style="Sub.TLabel")
         explorer_label.pack(anchor=tk.W, pady=(10, 5))
-        
+
+        # ── Search & Filter Panel ──────────────────────────────────────────────
+        filter_frame = ttk.LabelFrame(left_frame, text=" 🔍 Search & Filter ", padding=(6, 5))
+        filter_frame.pack(fill=tk.X, pady=(0, 8))
+
+        # Row 0 — Address search (full width)
+        search_row = ttk.Frame(filter_frame)
+        search_row.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(search_row, text="🔎", style="Sub.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add('write', lambda *_: self.apply_filters())
+        search_entry = ttk.Entry(search_row, textvariable=self.search_var)
+        search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=3)
+        self.match_count_label = ttk.Label(search_row, text="", style="Sub.TLabel", width=12, anchor=tk.E)
+        self.match_count_label.pack(side=tk.LEFT, padx=(6, 0))
+
+        # Row 1 — all dropdowns side-by-side + Clear button
+        drop_row = ttk.Frame(filter_frame)
+        drop_row.pack(fill=tk.X)
+
+        price_options = ["Any", "$100K+", "$200K+", "$300K+", "$400K+", "$500K+",
+                         "$600K+", "$700K+", "$800K+", "$900K+", "$1M+", "$1.5M+", "$2M+"]
+        price_max_options = ["Any", "≤$200K", "≤$300K", "≤$400K", "≤$500K",
+                             "≤$600K", "≤$700K", "≤$800K", "≤$900K", "≤$1M", "≤$1.5M", "≤$2M"]
+        sqft_options = ["Any", "500+", "750+", "1,000+", "1,250+", "1,500+",
+                        "1,750+", "2,000+", "2,500+", "3,000+", "4,000+", "5,000+"]
+        bed_options  = ["Any", "1+", "2+", "3+", "4+", "5+"]
+        bath_options = ["Any", "1+", "1.5+", "2+", "2.5+", "3+", "4+"]
+
+        def make_col(parent, label_text, var, options, width):
+            col = ttk.Frame(parent)
+            col.pack(side=tk.LEFT, padx=(0, 4))
+            ttk.Label(col, text=label_text, style="Sub.TLabel").pack(anchor=tk.W)
+            cb = ttk.Combobox(col, textvariable=var, values=options, state='readonly', width=width)
+            cb.pack()
+            return cb
+
+        self.price_min_var = tk.StringVar(value="Any")
+        self.price_min_var.trace_add('write', lambda *_: self.apply_filters())
+        make_col(drop_row, "Min $", self.price_min_var, price_options, 7)
+
+        self.price_max_var = tk.StringVar(value="Any")
+        self.price_max_var.trace_add('write', lambda *_: self.apply_filters())
+        make_col(drop_row, "Max $", self.price_max_var, price_max_options, 7)
+
+        self.sqft_var = tk.StringVar(value="Any")
+        self.sqft_var.trace_add('write', lambda *_: self.apply_filters())
+        make_col(drop_row, "Sq Ft", self.sqft_var, sqft_options, 6)
+
+        self.beds_var = tk.StringVar(value="Any")
+        self.beds_var.trace_add('write', lambda *_: self.apply_filters())
+        make_col(drop_row, "Beds", self.beds_var, bed_options, 4)
+
+        self.baths_var = tk.StringVar(value="Any")
+        self.baths_var.trace_add('write', lambda *_: self.apply_filters())
+        make_col(drop_row, "Baths", self.baths_var, bath_options, 4)
+
+        # Clear button aligned to bottom of dropdowns
+        clear_col = ttk.Frame(drop_row)
+        clear_col.pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Label(clear_col, text=" ", style="Sub.TLabel").pack(anchor=tk.W)  # spacer for alignment
+        ttk.Button(clear_col, text="✕ Clear", command=self.clear_filters, width=7).pack()
+        # ── End Search & Filter Panel ──────────────────────────────────────────
+
         explorer_container = ttk.Frame(left_frame)
         explorer_container.pack(fill=tk.BOTH, expand=True)
-        
+
         # Using Treeview for explorer look (Removed visible scrollbars for cleaner look)
         self.explorer_tree = ttk.Treeview(explorer_container, columns=('price', 'sqft', 'beds', 'baths'), show='tree headings', selectmode='browse')
         self.explorer_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
+
         # Configure headings with sorting capability
         self.explorer_tree.heading('#0', text=' Address', command=lambda: self.treeview_sort_column('#0', False))
         self.explorer_tree.heading('price', text=' Price', command=lambda: self.treeview_sort_column('price', False))
         self.explorer_tree.heading('sqft', text=' Sq Ft', command=lambda: self.treeview_sort_column('sqft', False))
         self.explorer_tree.heading('beds', text=' Bed', command=lambda: self.treeview_sort_column('beds', False))
         self.explorer_tree.heading('baths', text=' Bath', command=lambda: self.treeview_sort_column('baths', False))
-        
+
         # Add tooltips or indicators to show headers are clickable
         style = ttk.Style()
         style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
-        
+
         # Configure columns (Balanced for readability)
         self.explorer_tree.column("#0", stretch=True, width=350)
         self.explorer_tree.column("price", width=80, anchor=tk.W)
         self.explorer_tree.column("sqft", width=60, anchor=tk.W)
         self.explorer_tree.column("beds", width=35, anchor=tk.W)
         self.explorer_tree.column("baths", width=35, anchor=tk.W)
-        
+
         self.explorer_tree.bind('<<TreeviewSelect>>', self.on_tree_select)
-        
+        self.explorer_tree.bind('<Delete>', lambda e: self.delete_property())
+
         # Refresh container - 2 column layout
         button_frame = ttk.Frame(left_frame)
         button_frame.pack(fill=tk.X, pady=(15, 0))
-        
+
         # Configure grid columns to expand equally
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
-        
+
         ttk.Button(button_frame, text=" 🔄  REFRESH", command=self.refresh_properties).grid(row=0, column=0, sticky='ew', padx=(0, 3))
         ttk.Button(button_frame, text=" 🔔  UPDATES", command=self.manual_update_check).grid(row=0, column=1, sticky='ew', padx=(3, 0))
         
@@ -514,26 +579,167 @@ class RedfinDownloaderGUI:
         # Toggle sort order for next click
         self.explorer_tree.heading(col, command=lambda _col=col: self.treeview_sort_column(_col, not reverse))
 
-    def refresh_properties(self):
-        """Refresh the list of downloaded properties."""
+    # ── Filter helpers ────────────────────────────────────────────────────────
+
+    def _parse_price(self, price_str):
+        """Convert a price string like '$450,000' or '$1.2M' to a float."""
+        if not price_str or price_str in ('—', 'N/A', ''):
+            return None
+        s = price_str.replace('$', '').replace(',', '').strip().upper()
+        try:
+            if s.endswith('M'):
+                return float(s[:-1]) * 1_000_000
+            elif s.endswith('K'):
+                return float(s[:-1]) * 1_000
+            else:
+                return float(s)
+        except (ValueError, TypeError):
+            return None
+
+    def _parse_number(self, val_str):
+        """Parse a generic numeric string, stripping commas."""
+        if not val_str or val_str in ('—', 'N/A', ''):
+            return None
+        try:
+            return float(str(val_str).replace(',', '').strip())
+        except (ValueError, TypeError):
+            return None
+
+    def _price_min_threshold(self):
+        mapping = {
+            "Any": 0, "$100K+": 100_000, "$200K+": 200_000, "$300K+": 300_000,
+            "$400K+": 400_000, "$500K+": 500_000, "$600K+": 600_000,
+            "$700K+": 700_000, "$800K+": 800_000, "$900K+": 900_000,
+            "$1M+": 1_000_000, "$1.5M+": 1_500_000, "$2M+": 2_000_000,
+        }
+        return mapping.get(self.price_min_var.get(), 0)
+
+    def _price_max_threshold(self):
+        mapping = {
+            "Any": float('inf'), "≤$200K": 200_000, "≤$300K": 300_000,
+            "≤$400K": 400_000, "≤$500K": 500_000, "≤$600K": 600_000,
+            "≤$700K": 700_000, "≤$800K": 800_000, "≤$900K": 900_000,
+            "≤$1M": 1_000_000, "≤$1.5M": 1_500_000, "≤$2M": 2_000_000,
+        }
+        return mapping.get(self.price_max_var.get(), float('inf'))
+
+    def _sqft_threshold(self):
+        mapping = {
+            "Any": 0, "500+": 500, "750+": 750, "1,000+": 1_000,
+            "1,250+": 1_250, "1,500+": 1_500, "1,750+": 1_750,
+            "2,000+": 2_000, "2,500+": 2_500, "3,000+": 3_000,
+            "4,000+": 4_000, "5,000+": 5_000,
+        }
+        return mapping.get(self.sqft_var.get(), 0)
+
+    def _beds_threshold(self):
+        mapping = {"Any": 0, "1+": 1, "2+": 2, "3+": 3, "4+": 4, "5+": 5}
+        return mapping.get(self.beds_var.get(), 0)
+
+    def _baths_threshold(self):
+        mapping = {"Any": 0, "1+": 1, "1.5+": 1.5, "2+": 2, "2.5+": 2.5, "3+": 3, "4+": 4}
+        return mapping.get(self.baths_var.get(), 0)
+
+    def apply_filters(self):
+        """Filter the treeview based on current search/filter controls."""
+        if not hasattr(self, 'all_properties') or not self.all_properties:
+            return
+
+        search_text = self.search_var.get().strip().lower()
+        price_min = self._price_min_threshold()
+        price_max = self._price_max_threshold()
+        sqft_min = self._sqft_threshold()
+        beds_min = self._beds_threshold()
+        baths_min = self._baths_threshold()
+
+        # Clear tree
         for item in self.explorer_tree.get_children():
             self.explorer_tree.delete(item)
-            
+
+        matched = 0
+        for prop_data in self.all_properties:
+            prop = prop_data['name']
+            price_str = prop_data['price']
+            sqft_str = prop_data['sqft']
+            beds_str = prop_data['beds']
+            baths_str = prop_data['baths']
+            image_count = prop_data['image_count']
+
+            # Text search
+            if search_text and search_text not in prop.lower():
+                continue
+
+            # Price filter — only filter when we have a real value
+            price_val = self._parse_price(price_str)
+            if price_val is not None:
+                if price_val < price_min or price_val > price_max:
+                    continue
+            elif price_min > 0 or price_max < float('inf'):
+                # User set a price filter but we have no price data → skip
+                continue
+
+            # Sq Ft filter
+            sqft_val = self._parse_number(sqft_str)
+            if sqft_min > 0:
+                if sqft_val is None or sqft_val < sqft_min:
+                    continue
+
+            # Beds filter
+            beds_val = self._parse_number(beds_str)
+            if beds_min > 0:
+                if beds_val is None or beds_val < beds_min:
+                    continue
+
+            # Baths filter
+            baths_val = self._parse_number(baths_str)
+            if baths_min > 0:
+                if baths_val is None or baths_val < baths_min:
+                    continue
+
+            # Passed all filters — insert into tree
+            item_id = self.explorer_tree.insert('', tk.END, text=f" 🏠 {prop}",
+                                                values=(price_str, sqft_str, beds_str, baths_str))
+            self.explorer_tree.insert(item_id, tk.END, text=f"   📸 Photos ({image_count})",
+                                      values=(price_str, sqft_str, beds_str, baths_str), tags=('subnode',))
+            matched += 1
+
+        total = len(self.all_properties)
+        if matched == total:
+            self.match_count_label.config(text=f"{total} properties")
+        else:
+            self.match_count_label.config(text=f"{matched} of {total} shown")
+
+    def clear_filters(self):
+        """Reset all search and filter controls."""
+        self.search_var.set('')
+        self.price_min_var.set('Any')
+        self.price_max_var.set('Any')
+        self.sqft_var.set('Any')
+        self.beds_var.set('Any')
+        self.baths_var.set('Any')
+        # apply_filters is called automatically via trace
+
+    # ── End filter helpers ───────────────────────────────────────────────────
+
+    def refresh_properties(self):
+        """Refresh the list of downloaded properties."""
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
+            self.all_properties = []
+            self.apply_filters()
             return
-        
-        properties = [d for d in os.listdir(self.output_folder) 
-                     if os.path.isdir(os.path.join(self.output_folder, d))]
-        
+
+        properties = [d for d in os.listdir(self.output_folder)
+                      if os.path.isdir(os.path.join(self.output_folder, d))]
         properties.sort(reverse=True)
-        
+
         import json
+        self.all_properties = []
         for prop in properties:
             prop_path = os.path.join(self.output_folder, prop)
             images = self.get_image_files(prop_path)
             image_count = len(images)
-            
+
             # Load stats from JSON if it exists
             details = {}
             details_file = os.path.join(prop_path, 'property_details.json')
@@ -543,16 +749,17 @@ class RedfinDownloaderGUI:
                         details = json.load(f)
                 except:
                     pass
-            
-            price = details.get('price', '—')
-            sqft = details.get('sqft', '—')
-            beds = details.get('beds', '—')
-            baths = details.get('baths', '—')
-            
-            # Insert property node with detailed columns (Order: price, sqft, beds, baths)
-            item_id = self.explorer_tree.insert('', tk.END, text=f" 🏠 {prop}", values=(price, sqft, beds, baths))
-            # Insert a "Photos" sub-node
-            self.explorer_tree.insert(item_id, tk.END, text=f"   📸 Photos ({image_count})", values=(price, sqft, beds, baths), tags=('subnode',))
+
+            self.all_properties.append({
+                'name': prop,
+                'price': details.get('price', '—'),
+                'sqft': details.get('sqft', '—'),
+                'beds': details.get('beds', '—'),
+                'baths': details.get('baths', '—'),
+                'image_count': image_count,
+            })
+
+        self.apply_filters()
     
     def on_tree_select(self, event):
         """Handle property selection from the tree."""

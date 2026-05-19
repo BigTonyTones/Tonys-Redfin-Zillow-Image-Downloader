@@ -132,6 +132,9 @@ class RedfinDownloaderGUI:
         # Check for updates on startup
         self.check_for_updates()
         
+        # Graceful close binding to prevent background thread hangs
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
     def setup_styles(self):
         """Initialize custom premium styles."""
         self.root.configure(bg=self.colors['bg'])
@@ -411,7 +414,7 @@ class RedfinDownloaderGUI:
         controls_frame.pack(side=tk.RIGHT)
         
         # Exit button
-        exit_btn = ttk.Button(controls_frame, text="Exit", style="Exit.TButton", command=self.root.destroy)
+        exit_btn = ttk.Button(controls_frame, text="Exit", style="Exit.TButton", command=self.on_closing)
         exit_btn.pack(side=tk.LEFT, padx=3)
         
         # Delete and Open Folder buttons
@@ -1774,6 +1777,12 @@ class RedfinDownloaderGUI:
         
         self.root.destroy()
         sys.exit()
+    
+    def on_closing(self):
+        """Handle window close gracefully and forcefully exit the process to avoid thread hangs."""
+        self.download_cancelled = True
+        self.root.destroy()
+        os._exit(0)
     
     def manual_update_check(self):
         """Manually check for updates (triggered by button)."""

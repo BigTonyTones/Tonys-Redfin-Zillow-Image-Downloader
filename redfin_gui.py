@@ -61,7 +61,7 @@ import webbrowser
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.9.5"
+        self.version = "1.9.6"
         
         # Performance & DPI Optimizations for Windows
         try:

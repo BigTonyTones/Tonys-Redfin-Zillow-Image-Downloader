@@ -1,0 +1,6 @@
+# Force LF line endings for shell scripts and macOS launcher commands
+*.sh text eol=lf
+*.command text eol=lf
+
+# Ensure Windows batch files always use CRLF
+*.bat text eol=crlf

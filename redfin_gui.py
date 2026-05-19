@@ -16,7 +16,7 @@ except Exception:
 # Check and potentially install dependencies
 def check_dependencies():
     """Check for missing packages and ask user for permission to install."""
-    required_packages = ['requests', 'beautifulsoup4', 'Pillow']
+    required_packages = ['requests', 'beautifulsoup4', 'Pillow', 'soupsieve']
     missing = []
     
     for package in required_packages:
@@ -73,7 +73,7 @@ import webbrowser
 class RedfinDownloaderGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "1.9.9"
+        self.version = "2.0.0"
         
         # Performance & DPI Optimizations for Windows
         try:
@@ -389,16 +389,20 @@ class RedfinDownloaderGUI:
         self.explorer_tree.bind('<<TreeviewSelect>>', self.on_tree_select)
         self.explorer_tree.bind('<Delete>', lambda e: self.delete_property())
 
-        # Refresh container - 2 column layout
+        # Refresh container - 4 column layout
         button_frame = ttk.Frame(left_frame)
         button_frame.pack(fill=tk.X, pady=(15, 0))
 
         # Configure grid columns to expand equally
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
+        button_frame.columnconfigure(2, weight=1)
+        button_frame.columnconfigure(3, weight=1)
 
         ttk.Button(button_frame, text=" 🔄  REFRESH", command=self.refresh_properties).grid(row=0, column=0, sticky='ew', padx=(0, 3))
-        ttk.Button(button_frame, text=" 🔔  UPDATES", command=self.manual_update_check).grid(row=0, column=1, sticky='ew', padx=(3, 0))
+        ttk.Button(button_frame, text=" 📊 EXCEL EXPORT", command=self.export_to_excel).grid(row=0, column=1, sticky='ew', padx=3)
+        ttk.Button(button_frame, text=" 🖼️ IMAGE CONVERTER", command=self.open_image_converter).grid(row=0, column=2, sticky='ew', padx=3)
+        ttk.Button(button_frame, text=" 🔔  UPDATES", command=self.manual_update_check).grid(row=0, column=3, sticky='ew', padx=(3, 0))
         
         # === RIGHT PANEL - GALLERY VIEWER ===
         
@@ -744,6 +748,157 @@ class RedfinDownloaderGUI:
         # apply_filters is called automatically via trace
 
     # ── End filter helpers ───────────────────────────────────────────────────
+
+    def export_to_excel(self):
+        """Export all property data to a CSV file that can be opened in Excel."""
+        if not os.path.exists(self.output_folder):
+            messagebox.showwarning("No Data", "No property data available to export.")
+            return
+
+        properties = [d for d in os.listdir(self.output_folder)
+                      if os.path.isdir(os.path.join(self.output_folder, d))]
+        
+        if not properties:
+            messagebox.showwarning("No Data", "No properties found to export.")
+            return
+
+        import csv
+        import json
+        from tkinter import filedialog
+        
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV (Excel) file", "*.csv"), ("All Files", "*.*")],
+            title="Save Excel/CSV Export",
+            initialfile="House_Properties_Export.csv"
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                # Write header
+                writer.writerow(["Address / Folder Name", "Price", "Beds", "Baths", "Sq Ft", "Images Downloaded", "Listing URL", "Description"])
+                
+                # Write data
+                for prop in properties:
+                    prop_path = os.path.join(self.output_folder, prop)
+                    images = self.get_image_files(prop_path)
+                    image_count = len(images)
+                    
+                    details = {}
+                    details_file = os.path.join(prop_path, 'property_details.json')
+                    if os.path.exists(details_file):
+                        try:
+                            with open(details_file, 'r') as df:
+                                details = json.load(df)
+                        except:
+                            pass
+                    
+                    writer.writerow([
+                        prop,
+                        details.get('price', '—'),
+                        details.get('beds', '—'),
+                        details.get('baths', '—'),
+                        details.get('sqft', '—'),
+                        image_count,
+                        details.get('url', ''),
+                        details.get('description', '')
+                    ])
+            
+            messagebox.showinfo("Export Successful", f"Successfully exported data to:\n{file_path}\n\nYou can open this file directly in Excel.")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export data:\n{e}")
+
+    def open_image_converter(self):
+        """Open a utility to convert all downloaded images in the House_Images folder."""
+        if not os.path.exists(self.output_folder):
+            messagebox.showwarning("No Images", "No properties downloaded yet.")
+            return
+
+        converter_window = tk.Toplevel(self.root)
+        converter_window.title("Image Converter")
+        converter_window.geometry("450x250")
+        converter_window.configure(bg=self.colors['bg'])
+        
+        # Center the window
+        converter_window.transient(self.root)
+        converter_window.grab_set()
+
+        main_frame = ttk.Frame(converter_window, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Bulk Image Converter", style="Header.TLabel").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(main_frame, text="Convert all WEBP files in all properties to your favorite format:", style="Sub.TLabel", wraplength=400).pack(anchor=tk.W, pady=(0, 15))
+
+        # Format selection
+        format_frame = ttk.Frame(main_frame)
+        format_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(format_frame, text="Target Format:", style="TLabel").pack(side=tk.LEFT, padx=(0, 10))
+        
+        format_var = tk.StringVar(value="JPG")
+        ttk.Radiobutton(format_frame, text="JPG", variable=format_var, value="JPG").pack(side=tk.LEFT, padx=10)
+        ttk.Radiobutton(format_frame, text="PNG", variable=format_var, value="PNG").pack(side=tk.LEFT, padx=10)
+
+        # Delete original checkbox
+        delete_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(main_frame, text="Delete original photo after converting", 
+                        variable=delete_var).pack(anchor=tk.W, pady=15)
+
+        # Convert button
+        def do_conversion():
+            target_format = format_var.get().lower()
+            delete_orig = delete_var.get()
+            
+            # Find all images in all property folders
+            images = []
+            if os.path.exists(self.output_folder):
+                for prop in os.listdir(self.output_folder):
+                    prop_path = os.path.join(self.output_folder, prop)
+                    if os.path.isdir(prop_path):
+                        images.extend(self.get_image_files(prop_path))
+            
+            if not images:
+                messagebox.showinfo("No Images", "No images found to convert.")
+                converter_window.destroy()
+                return
+
+            converted_count = 0
+            for img_path in images:
+                ext = os.path.splitext(img_path)[1].lower()
+                
+                # Only convert WEBP files
+                if ext != '.webp':
+                    continue
+
+                try:
+                    img = Image.open(img_path)
+                    # Convert to RGB if target is JPG and image is RGBA/P
+                    if target_format == 'jpg' and img.mode in ('RGBA', 'P'):
+                        img = img.convert('RGB')
+                        
+                    new_path = os.path.splitext(img_path)[0] + f".{target_format}"
+                    img.save(new_path, format='JPEG' if target_format == 'jpg' else 'PNG')
+                    img.close()
+                    
+                    if delete_orig:
+                        os.remove(img_path)
+                        
+                    converted_count += 1
+                except Exception as e:
+                    print(f"Failed to convert {img_path}: {e}")
+
+            messagebox.showinfo("Conversion Complete", f"Successfully converted {converted_count} images.")
+            converter_window.destroy()
+            
+            # Reload images for the current property if one is selected
+            if self.current_property:
+                self.load_property_images(self.current_property)
+
+        ttk.Button(main_frame, text="Start Conversion", command=do_conversion).pack(fill=tk.X, pady=(10, 0))
 
     def refresh_properties(self):
         """Refresh the list of downloaded properties."""

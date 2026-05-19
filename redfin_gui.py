@@ -8,7 +8,8 @@ os.environ['TK_SILENCE_DEPRECATION'] = '1'
 
 # Suppress urllib3 NotOpenSSLWarning on macOS systems using system Python 3.9.6
 try:
-    warnings.filterwarnings("ignore", message=".*NotOpenSSLWarning.*")
+    warnings.filterwarnings("ignore", message=".*urllib3 v2.*")
+    warnings.filterwarnings("ignore", message=".*LibreSSL.*")
 except Exception:
     pass
 

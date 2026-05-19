@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo Tonys Redfin Zillow Image Downloader v1.9.6
+echo Tonys Redfin Zillow Image Downloader v1.9.7
 echo ============================================
 echo.
 

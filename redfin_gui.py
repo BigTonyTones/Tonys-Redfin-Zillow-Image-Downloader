@@ -1,5 +1,16 @@
-import subprocess
+import os
 import sys
+import subprocess
+import warnings
+
+# Suppress annoying macOS Tkinter deprecation warning
+os.environ['TK_SILENCE_DEPRECATION'] = '1'
+
+# Suppress urllib3 NotOpenSSLWarning on macOS systems using system Python 3.9.6
+try:
+    warnings.filterwarnings("ignore", message=".*NotOpenSSLWarning.*")
+except Exception:
+    pass
 
 # Check and potentially install dependencies
 def check_dependencies():
@@ -79,6 +90,15 @@ class RedfinDownloaderGUI:
             self.root.state('zoomed')  # For Windows
         except:
             self.root.attributes('-zoomed', True) # For Linux/Mac
+            
+        # Force window to focus to the front on macOS (prevents hiding behind terminal)
+        if sys.platform == 'darwin':
+            try:
+                self.root.lift()
+                self.root.attributes('-topmost', True)
+                self.root.after_idle(self.root.attributes, '-topmost', False)
+            except Exception:
+                pass
         
         # Color Palette - Refined Dark Theme (matching reference)
         self.colors = {
